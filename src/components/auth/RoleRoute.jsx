@@ -15,12 +15,12 @@ export default function RoleRoute({ children, allowedRoles }) {
     return <Navigate to="/subscription" replace />;
   }
 
-  // Super admin can only access /super-admin/* routes — unless they're impersonating a gym
-  if (role === 'superadmin' && !allowedRoles?.includes('superadmin') && !isImpersonating) {
-    return <Navigate to="/super-admin" replace />;
+  // If visiting /super-admin, redirect directly to Deep Fitness dashboard
+  if (location.pathname.startsWith('/super-admin')) {
+    return <Navigate to="/" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(role) && !isImpersonating) {
+  if (allowedRoles && !allowedRoles.includes(role) && role !== 'superadmin' && !isImpersonating) {
     return <Navigate to={role === 'staff' ? '/checkin' : '/'} replace />;
   }
 

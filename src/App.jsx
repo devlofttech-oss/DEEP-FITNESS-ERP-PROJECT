@@ -30,22 +30,11 @@ import LeadList from './pages/leads/LeadList';
 import MeasurementList from './pages/measurements/MeasurementList';
 import WorkoutList from './pages/workouts/WorkoutList';
 import PTList from './pages/pt/PTList';
-// import DietList from './pages/diet/DietList'; // Diet module on hold
 import RenewalsList from './pages/renewals/RenewalsList';
 import WACreditsPage from './pages/communication/WACreditsPage';
 import WACreditsReturn from './pages/communication/WACreditsReturn';
 import MemberQRPage from './pages/public/MemberQRPage';
 import ReceiptPage from './pages/public/ReceiptPage';
-
-// Super Admin
-import SuperAdminLayout from './pages/super-admin/SuperAdminLayout';
-import SuperAdminDashboard from './pages/super-admin/SuperAdminDashboard';
-import GymList from './pages/super-admin/GymList';
-import GymForm from './pages/super-admin/GymForm';
-import SetupSuperAdmin from './pages/super-admin/SetupSuperAdmin';
-import TrialList from './pages/super-admin/TrialList';
-import SubscriptionPlans from './pages/super-admin/SubscriptionPlans';
-import FeatureRequests from './pages/super-admin/FeatureRequests';
 import RegisterPage from './pages/RegisterPage';
 import Onboarding from './pages/Onboarding';
 import SubscriptionEnded from './pages/SubscriptionEnded';
@@ -75,9 +64,8 @@ function RoleRedirect() {
   return <Dashboard />;
 }
 
-const ADMIN      = ['admin'];
-const ALL        = ['admin', 'staff'];
-const SUPERADMIN = ['superadmin'];
+const ADMIN = ['admin', 'superadmin'];
+const ALL   = ['admin', 'staff', 'superadmin'];
 
 export default function App() {
   return (
@@ -85,9 +73,12 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/subscription-ended" element={<SubscriptionEnded />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route path="/setup-superadmin" element={<SetupSuperAdmin />} />
       <Route path="/qr/:memberId" element={<MemberQRPage />} />
       <Route path="/receipt/:receiptId" element={<ReceiptPage />} />
+
+      {/* Redirect /super-admin directly to Deep Fitness dashboard */}
+      <Route path="/super-admin/*" element={<Navigate to="/" replace />} />
+      <Route path="/super-admin" element={<Navigate to="/" replace />} />
 
       {/* First-login onboarding */}
       <Route path="/onboarding" element={
@@ -103,23 +94,13 @@ export default function App() {
         </RoleRoute>
       } />
 
-      {/* Super Admin panel */}
-      <Route path="/super-admin" element={
-        <RoleRoute allowedRoles={SUPERADMIN}>
-          <SuperAdminLayout />
-        </RoleRoute>
-      }>
-        <Route index element={<SuperAdminDashboard />} />
-        <Route path="gyms" element={<GymList />} />
-        <Route path="gyms/new" element={<GymForm />} />
-        <Route path="gyms/:id/edit" element={<GymForm />} />
-        <Route path="trials" element={<TrialList />} />
-        <Route path="plans" element={<SubscriptionPlans />} />
-        <Route path="feature-requests" element={<FeatureRequests />} />
-      </Route>
-
-      {/* Gym ERP (admin + staff) */}
+      {/* Deep Fitness Gym ERP (admin + staff) */}
       <Route path="/*" element={
+        <RoleRoute allowedRoles={ALL}>
+          <DashboardLayout />
+        </RoleRoute>
+      } />
+      <Route path="/" element={
         <RoleRoute allowedRoles={ALL}>
           <DashboardLayout />
         </RoleRoute>
@@ -127,41 +108,36 @@ export default function App() {
         <Route index element={<RoleRedirect />} />
 
         {/* Admin-only */}
-        {/* Subscription: admin buys/renews; PhonePe returns to /subscription/return */}
         <Route path="subscription"               element={<RoleRoute allowedRoles={ADMIN}><SubscribePage /></RoleRoute>} />
         <Route path="subscription/return"        element={<RoleRoute allowedRoles={ADMIN}><PaymentReturn /></RoleRoute>} />
-<Route path="members"            element={<RoleRoute allowedRoles={ADMIN}><MemberList /></RoleRoute>} />
+        <Route path="members"            element={<RoleRoute allowedRoles={ADMIN}><MemberList /></RoleRoute>} />
         <Route path="members/import"     element={<RoleRoute allowedRoles={ADMIN}><BulkImportMembers /></RoleRoute>} />
         <Route path="members/add"        element={<RoleRoute allowedRoles={ADMIN}><AddMember /></RoleRoute>} />
         <Route path="members/:id"        element={<RoleRoute allowedRoles={ADMIN}><MemberProfile /></RoleRoute>} />
-        <Route path="members/:id/edit"   element={<RoleRoute allowedRoles={ADMIN}><AddMember /></RoleRoute>} />
-        <Route path="payments"          element={<RoleRoute allowedRoles={ADMIN}><PaymentsList /></RoleRoute>} />
-        <Route path="payments/new"      element={<RoleRoute allowedRoles={ADMIN}><PaymentPage /></RoleRoute>} />
-        <Route path="classes"           element={<RoleRoute allowedRoles={ADMIN}><ClassList /></RoleRoute>} />
-        <Route path="classes/add"       element={<RoleRoute allowedRoles={ADMIN}><AddClass /></RoleRoute>} />
-        <Route path="classes/edit/:id"  element={<RoleRoute allowedRoles={ADMIN}><AddClass /></RoleRoute>} />
-        <Route path="classes/:id"       element={<RoleRoute allowedRoles={ADMIN}><ClassDetail /></RoleRoute>} />
-        <Route path="staff"             element={<RoleRoute allowedRoles={ADMIN}><StaffList /></RoleRoute>} />
-        <Route path="staff/:id"         element={<RoleRoute allowedRoles={ADMIN}><StaffProfile /></RoleRoute>} />
-        <Route path="equipment"         element={<RoleRoute allowedRoles={ADMIN}><EquipmentList /></RoleRoute>} />
-        <Route path="supplements"       element={<RoleRoute allowedRoles={ADMIN}><SupplementList /></RoleRoute>} />
-        <Route path="expenses"          element={<RoleRoute allowedRoles={ADMIN}><ExpenseList /></RoleRoute>} />
-        <Route path="plans"             element={<RoleRoute allowedRoles={ADMIN}><PlanList /></RoleRoute>} />
-        <Route path="leads"             element={<RoleRoute allowedRoles={ADMIN}><LeadList /></RoleRoute>} />
-        <Route path="measurements"      element={<RoleRoute allowedRoles={ALL}><MeasurementList /></RoleRoute>} />
-        <Route path="workouts"          element={<RoleRoute allowedRoles={ADMIN}><WorkoutList /></RoleRoute>} />
-        <Route path="pt"                element={<RoleRoute allowedRoles={ADMIN}><PTList /></RoleRoute>} />
-        {/* <Route path="diet" element={<RoleRoute allowedRoles={ADMIN}><DietList /></RoleRoute>} /> */} {/* Diet module on hold */}
-<Route path="renewals"          element={<RoleRoute allowedRoles={ADMIN}><RenewalsList /></RoleRoute>} />
-        <Route path="whatsapp-credits"        element={<RoleRoute allowedRoles={ADMIN}><WACreditsPage /></RoleRoute>} />
-        <Route path="whatsapp-credits/return" element={<RoleRoute allowedRoles={ADMIN}><WACreditsReturn /></RoleRoute>} />
-        <Route path="reports/monthly"   element={<RoleRoute allowedRoles={ADMIN}><MonthlyReport /></RoleRoute>} />
-        <Route path="settings"          element={<RoleRoute allowedRoles={ADMIN}><Settings /></RoleRoute>} />
+        <Route path="payments"           element={<RoleRoute allowedRoles={ADMIN}><PaymentsList /></RoleRoute>} />
+        <Route path="payments/new"       element={<RoleRoute allowedRoles={ADMIN}><PaymentPage /></RoleRoute>} />
+        <Route path="plans"              element={<RoleRoute allowedRoles={ADMIN}><PlanList /></RoleRoute>} />
+        <Route path="classes"            element={<RoleRoute allowedRoles={ADMIN}><ClassList /></RoleRoute>} />
+        <Route path="classes/new"        element={<RoleRoute allowedRoles={ADMIN}><AddClass /></RoleRoute>} />
+        <Route path="classes/:id"        element={<RoleRoute allowedRoles={ADMIN}><ClassDetail /></RoleRoute>} />
+        <Route path="staff"              element={<RoleRoute allowedRoles={ADMIN}><StaffList /></RoleRoute>} />
+        <Route path="staff/:id"          element={<RoleRoute allowedRoles={ADMIN}><StaffProfile /></RoleRoute>} />
+        <Route path="equipment"          element={<RoleRoute allowedRoles={ADMIN}><EquipmentList /></RoleRoute>} />
+        <Route path="supplements"        element={<RoleRoute allowedRoles={ADMIN}><SupplementList /></RoleRoute>} />
+        <Route path="expenses"           element={<RoleRoute allowedRoles={ADMIN}><ExpenseList /></RoleRoute>} />
+        <Route path="reports/monthly"    element={<RoleRoute allowedRoles={ADMIN}><MonthlyReport /></RoleRoute>} />
+        <Route path="leads"              element={<RoleRoute allowedRoles={ADMIN}><LeadList /></RoleRoute>} />
+        <Route path="workouts"           element={<RoleRoute allowedRoles={ADMIN}><WorkoutList /></RoleRoute>} />
+        <Route path="pt"                 element={<RoleRoute allowedRoles={ADMIN}><PTList /></RoleRoute>} />
+        <Route path="renewals"           element={<RoleRoute allowedRoles={ADMIN}><RenewalsList /></RoleRoute>} />
+        <Route path="wa-credits"         element={<RoleRoute allowedRoles={ADMIN}><WACreditsPage /></RoleRoute>} />
+        <Route path="wa-credits/return"  element={<RoleRoute allowedRoles={ADMIN}><WACreditsReturn /></RoleRoute>} />
+        <Route path="settings"           element={<RoleRoute allowedRoles={ADMIN}><Settings /></RoleRoute>} />
 
-        <Route path="attendance" element={<RoleRoute allowedRoles={ALL}><AllCheckins /></RoleRoute>} />
-        <Route path="checkin"    element={<RoleRoute allowedRoles={ALL}><CheckinScreen /></RoleRoute>} />
-
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Staff + Admin */}
+        <Route path="checkin"            element={<RoleRoute allowedRoles={ALL}><CheckinScreen /></RoleRoute>} />
+        <Route path="attendance"         element={<RoleRoute allowedRoles={ALL}><AllCheckins /></RoleRoute>} />
+        <Route path="measurements"       element={<RoleRoute allowedRoles={ALL}><MeasurementList /></RoleRoute>} />
       </Route>
     </Routes>
   );

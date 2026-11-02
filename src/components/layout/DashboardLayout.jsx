@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
@@ -60,17 +60,11 @@ const STAFF_NAV = [
 export default function DashboardLayout() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [supportModal, setSupportModal] = useState(null); // 'feature' | 'contact'
-  const { isImpersonating, gymData, gymId, exitGym, role } = useAuth();
-  const navigate = useNavigate();
+  const { gymData, gymId, role } = useAuth();
   const location = useLocation();
 
   // Close More drawer on route change
   useEffect(() => { setMoreOpen(false); }, [location.pathname]);
-
-  const handleExit = () => {
-    exitGym();
-    navigate('/super-admin');
-  };
 
   const isAdmin = role !== 'staff';
 
@@ -88,21 +82,6 @@ export default function DashboardLayout() {
 
   return (
     <div className="bg-background text-on-background antialiased flex flex-col h-screen overflow-hidden">
-      {isImpersonating && (
-        <div className="shrink-0 z-50 bg-amber-500 text-white flex items-center justify-between px-4 py-2 text-sm font-medium">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px]">visibility</span>
-            Viewing as Super Admin: <span className="font-bold ml-1">{gymData?.name}</span>
-          </div>
-          <button
-            onClick={handleExit}
-            className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg transition-colors text-xs font-semibold">
-            <span className="material-symbols-outlined text-[14px]">logout</span>
-            Exit
-          </button>
-        </div>
-      )}
-
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden relative md:ml-24">
@@ -112,43 +91,52 @@ export default function DashboardLayout() {
           </main>
         </div>
 
-        {/* ── Mobile Bottom Navigation ── */}
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/50 dark:border-slate-800/50 flex items-center justify-around h-16 px-1">
+        {/* ── Mobile Bottom Navigation Bar (below md) ── */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest/90 backdrop-blur-xl border-t border-outline-variant/30 px-3 py-2 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
           {pinnedItems.map(item => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center gap-0.5 flex-1 h-full py-1 rounded-xl transition-colors ${
-                  isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'
+                `flex flex-col items-center gap-1 py-1 px-3 rounded-2xl transition-all duration-200 ${
+                  isActive
+                    ? 'text-primary'
+                    : 'text-on-surface-variant hover:text-on-surface'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <span className="material-symbols-outlined text-[22px]"
-                    style={{ fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0" }}>
-                    {item.icon}
+                  <div className={`p-1 rounded-xl transition-colors ${isActive ? 'bg-primary-container' : ''}`}>
+                    <span
+                      className="material-symbols-outlined text-[22px] transition-transform duration-200"
+                      style={{ fontVariationSettings: isActive && item.fill ? "'FILL' 1" : "'FILL' 0" }}
+                    >
+                      {item.icon}
+                    </span>
+                  </div>
+                  <span className={`text-[10px] leading-none ${isActive ? 'font-bold' : 'font-medium'}`}>
+                    {item.label}
                   </span>
-                  <span className="text-[10px] font-medium leading-none">{item.label}</span>
                 </>
               )}
             </NavLink>
           ))}
 
-          {/* More — only opens, never toggles (close lives inside the overlay) */}
+          {/* "More" button — admin only */}
           {isAdmin && (
             <button
               onClick={() => setMoreOpen(true)}
-              className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full py-1 rounded-xl transition-colors ${
-                isMoreActive || moreOpen ? 'text-primary' : 'text-slate-400 dark:text-slate-500'
+              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-2xl transition-all duration-200 ${
+                isMoreActive || moreOpen ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              <span className="material-symbols-outlined text-[22px]"
-                style={{ fontVariationSettings: (isMoreActive || moreOpen) ? "'FILL' 1" : "'FILL' 0" }}>
-                grid_view
-              </span>
+              <div className={`p-1 rounded-xl transition-colors ${isMoreActive || moreOpen ? 'bg-primary-container' : ''}`}>
+                <span className="material-symbols-outlined text-[22px]">
+                  grid_view
+                </span>
+              </div>
               <span className="text-[10px] font-medium leading-none">More</span>
             </button>
           )}
@@ -163,7 +151,7 @@ export default function DashboardLayout() {
             <div className="flex items-center justify-between px-5 pt-14 pb-5 shrink-0">
               <div>
                 <h2 className="text-white text-xl font-bold tracking-tight">Modules</h2>
-                <p className="text-white/40 text-xs mt-0.5">{gymData?.name || 'Kilos'}</p>
+                <p className="text-white/40 text-xs mt-0.5">{gymData?.name || 'Deep Fitness'}</p>
               </div>
               <button
                 onClick={() => setMoreOpen(false)}
@@ -218,43 +206,6 @@ export default function DashboardLayout() {
                     </div>
                   );
                 })}
-              </div>
-
-              {/* Tools */}
-              <div className="mt-8">
-                <p className="text-white/30 text-[10px] font-bold uppercase tracking-[0.15em] mb-3">
-                  Tools
-                </p>
-                <NavLink
-                  to="/members/import"
-                  className="flex items-center gap-3 py-3 px-4 rounded-2xl bg-white/8 border border-white/5 active:bg-white/15 transition-all active:scale-95"
-                >
-                  <span className="material-symbols-outlined text-[20px] text-white/80">upload_file</span>
-                  <span className="text-[13px] font-medium text-white/80">Bulk Import Members</span>
-                </NavLink>
-              </div>
-
-              {/* Support footer — Contact Us + Request a Feature */}
-              <div className="mt-8 pt-6 border-t border-white/10">
-                <p className="text-white/30 text-[10px] font-bold uppercase tracking-[0.15em] mb-3">
-                  Support
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setSupportModal('contact')}
-                    className="flex items-center gap-3 py-3 px-4 rounded-2xl bg-white/8 border border-white/5 active:bg-white/15 transition-all active:scale-95"
-                  >
-                    <span className="material-symbols-outlined text-[20px] text-white/80">support_agent</span>
-                    <span className="text-[13px] font-medium text-white/80">Contact Us</span>
-                  </button>
-                  <button
-                    onClick={() => setSupportModal('feature')}
-                    className="flex items-center gap-3 py-3 px-4 rounded-2xl bg-white/8 border border-white/5 active:bg-white/15 transition-all active:scale-95"
-                  >
-                    <span className="material-symbols-outlined text-[20px] text-white/80">star</span>
-                    <span className="text-[13px] font-medium text-white/80">Request a Feature</span>
-                  </button>
-                </div>
               </div>
             </div>
           </div>

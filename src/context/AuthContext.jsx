@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from '../firebase/config';
-import { getDocument, getCollection, updateDocument } from '../firebase/db';
+import { getDocument, getCollection } from '../firebase/db';
 
 const AuthContext = createContext();
 
@@ -9,14 +9,16 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+const DEEP_FITNESS_ID = '0SOHig4HQsk4rdpfK0Ck';
+
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser]     = useState(null);
   const [role, setRole]                   = useState(null);
   const [userName, setUserName]           = useState('');
-  const [gymId, setGymId]                 = useState(null);
-  const [activeGymId, setActiveGymId]     = useState(null);
+  const [gymId, setGymId]                 = useState(DEEP_FITNESS_ID);
+  const [activeGymId, setActiveGymId]     = useState(DEEP_FITNESS_ID);
   const [gymData, setGymData]             = useState(null);
-  const [gymIds, setGymIds]               = useState([]);
+  const [gymIds, setGymIds]               = useState([DEEP_FITNESS_ID]);
   const [gymBranches, setGymBranches]     = useState([]);
   const [isSuperAdmin, setIsSuperAdmin]   = useState(false);
   const [loading, setLoading]             = useState(true);
@@ -31,25 +33,6 @@ export function AuthProvider({ children }) {
     setImpersonatedGymId(gym.id);
     setImpersonatedGymData(gym);
     setImpersonatedBranches([gym]);
-    // Async: load all branches belonging to this gym's owner
-    if (gym.ownerEmail) {
-      getCollection('users', [{ field: 'email', op: '==', value: gym.ownerEmail }])
-        .then(async (ownerUsers) => {
-          if (!ownerUsers.length) return;
-          const ownerUser = ownerUsers[0];
-          const allGymIds = (ownerUser.gymIds?.length > 0)
-            ? ownerUser.gymIds
-            : (ownerUser.gymId ? [ownerUser.gymId] : []);
-          if (allGymIds.length <= 1) return;
-          const branchDocs = await Promise.all(allGymIds.map(id => getDocument('gyms', id)));
-          const branches = allGymIds.map((id, i) => {
-            const doc = branchDocs[i];
-            return doc ? { id, ...doc } : null;
-          }).filter(Boolean);
-          if (branches.length > 1) setImpersonatedBranches(branches);
-        })
-        .catch(() => {});
-    }
   };
 
   const exitGym = () => {
@@ -74,7 +57,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Switches the active branch and reloads the page so all data re-fetches cleanly.
   const switchBranch = (newGymId) => {
     if (!gymIds.includes(newGymId)) return;
     if (newGymId === activeGymId) return;
@@ -84,7 +66,6 @@ export function AuthProvider({ children }) {
     window.location.href = '/';
   };
 
-  // Called after a new branch is created in Settings to update context without reload.
   const addBranch = (newGymId, newGymName) => {
     setGymIds(prev => [...prev, newGymId]);
     setGymBranches(prev => [...prev, { id: newGymId, name: newGymName }]);
@@ -96,104 +77,61 @@ export function AuthProvider({ children }) {
       if (user) {
         try {
           const userDoc = await getDocument('users', user.uid);
-          if (!userDoc || userDoc.role === 'deleted') {
+          if (userDoc && userDoc.role === 'deleted') {
             setInactiveGymError(true);
             await signOut(auth);
             return;
           }
-          const userRole = userDoc.role || 'admin';
 
-          if (userRole === 'superadmin') {
-            setRole('superadmin');
-            setIsSuperAdmin(true);
-            setGymId(null);
-            setActiveGymId(null);
-            setGymIds([]);
-            setGymBranches([]);
-            setGymData(null);
-            setUserName(userDoc?.name || 'Super Admin');
-          } else {
-            const primaryGymId = userDoc?.gymId || null;
-            // gymIds array: use stored array or fall back to single primary gym.
-            // This means existing gyms automatically work as a single branch.
-            const allGymIds = (userDoc?.gymIds && userDoc.gymIds.length > 0)
-              ? userDoc.gymIds
-              : (primaryGymId ? [primaryGymId] : []);
+          // In Deep Fitness ERP, all authorized users directly open Deep Fitness Gym
+          const targetGymId = userDoc?.gymId || DEEP_FITNESS_ID;
+          const allGymIds = (userDoc?.gymIds && userDoc.gymIds.length > 0)
+            ? userDoc.gymIds
+            : [targetGymId];
 
-            setGymId(primaryGymId);
-            setGymIds(allGymIds);
+          setGymId(targetGymId);
+          setGymIds(allGymIds);
 
-            // Restore last-used branch from localStorage
-            const saved = localStorage.getItem(`activeBranch_${user.uid}`);
-            const resolvedActiveId = (saved && allGymIds.includes(saved))
-              ? saved
-              : (allGymIds[0] || null);
+          const saved = localStorage.getItem(`activeBranch_${user.uid}`);
+          const resolvedActiveId = (saved && allGymIds.includes(saved))
+            ? saved
+            : targetGymId;
 
-            setActiveGymId(resolvedActiveId);
+          setActiveGymId(resolvedActiveId);
 
-            if (allGymIds.length > 0) {
-              // Fetch all branch gym docs in parallel (1 read for single-branch, N for multi)
-              const branchDocs = await Promise.all(allGymIds.map(id => getDocument('gyms', id)));
+          const branchDocs = await Promise.all(allGymIds.map(id => getDocument('gyms', id)));
+          const branches = branchDocs.map((g, i) => ({
+            id: allGymIds[i],
+            name: g?.name || `Branch ${i + 1}`,
+          }));
+          setGymBranches(branches);
 
-              const branches = branchDocs.map((g, i) => ({
-                id: allGymIds[i],
-                name: g?.name || `Branch ${i + 1}`,
-              }));
-              setGymBranches(branches);
+          const activeIdx = allGymIds.indexOf(resolvedActiveId);
+          const activeGym = activeIdx >= 0 ? branchDocs[activeIdx] : branchDocs[0];
 
-              // Set gymData for the active branch
-              const activeIdx = allGymIds.indexOf(resolvedActiveId);
-              const activeGym = activeIdx >= 0 ? branchDocs[activeIdx] : branchDocs[0];
+          setGymData(activeGym || { id: DEEP_FITNESS_ID, name: 'Deep Fitness Gym' });
+          setIsPlanBlocked(false);
+          setInactiveGymError(false);
+          setGymBlockReason(null);
 
-              if (!activeGym || activeGym.isActive === false) {
-                setGymBlockReason('inactive');
-                setInactiveGymError(true);
-                await signOut(auth);
-                return;
-              }
-
-              // Enforce plan access dates — keep logged in but block dashboard
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              let planBlocked = false;
-              let blockReason = null;
-              if (activeGym.planStartDate) {
-                const start = new Date(activeGym.planStartDate);
-                start.setHours(0, 0, 0, 0);
-                if (today < start) { planBlocked = true; blockReason = 'plan_not_started'; }
-              }
-              if (!planBlocked && activeGym.planEndDate) {
-                const end = new Date(activeGym.planEndDate);
-                end.setHours(23, 59, 59, 999);
-                if (today > end) { planBlocked = true; blockReason = 'plan_expired'; }
-              }
-
-              // Keep the session alive. Signing an expired gym out locks the
-              // admin out of the one page they need — /subscription requires a
-              // Firebase ID token to start a payment, so a signed-out admin
-              // could never renew themselves. RoleRoute confines them to the
-              // subscription page until planEndDate moves.
-              setIsPlanBlocked(planBlocked);
-              setGymBlockReason(planBlocked ? blockReason : null);
-
-              setGymData(activeGym);
-              setInactiveGymError(false);
-            }
-
-            setRole(userRole);
-            setUserName(userDoc?.name || user.displayName || user.email?.split('@')[0] || '');
-            setIsSuperAdmin(false);
-          }
-        } catch {
+          setRole(userDoc?.role === 'staff' ? 'staff' : 'admin');
+          setUserName(userDoc?.name || user.displayName || 'Deep Fitness Admin');
+          setIsSuperAdmin(false);
+        } catch (err) {
+          console.error('Error loading user/gym:', err);
+          const gymDoc = await getDocument('gyms', DEEP_FITNESS_ID);
+          setGymData(gymDoc || { id: DEEP_FITNESS_ID, name: 'Deep Fitness Gym' });
+          setGymId(DEEP_FITNESS_ID);
+          setActiveGymId(DEEP_FITNESS_ID);
           setRole('admin');
-          setUserName(user.displayName || user.email?.split('@')[0] || '');
+          setUserName(user.displayName || user.email?.split('@')[0] || 'Deep Fitness Admin');
         }
       } else {
         setRole(null);
         setUserName('');
-        setGymId(null);
-        setActiveGymId(null);
-        setGymIds([]);
+        setGymId(DEEP_FITNESS_ID);
+        setActiveGymId(DEEP_FITNESS_ID);
+        setGymIds([DEEP_FITNESS_ID]);
         setGymBranches([]);
         setGymData(null);
         setIsSuperAdmin(false);
@@ -213,8 +151,6 @@ export function AuthProvider({ children }) {
 
   const logout = () => signOut(auth);
 
-  const isImpersonating = !!impersonatedGymId;
-
   return (
     <AuthContext.Provider value={{
       currentUser, role, userName,
@@ -226,7 +162,7 @@ export function AuthProvider({ children }) {
       inactiveGymError,
       gymBlockReason,
       isPlanBlocked,
-      isImpersonating,
+      isImpersonating: false,
       impersonatedBranches,
       enterGym, exitGym, updateGymData,
       switchBranch, addBranch, switchImpersonatedBranch,
