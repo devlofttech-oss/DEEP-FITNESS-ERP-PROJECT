@@ -3,7 +3,7 @@ import NotificationPanel from '../ui/NotificationPanel';
 import { useAuth } from '../../context/AuthContext';
 import { syncNotifications } from '../../services/notificationSync';
 import { useNavigate } from 'react-router-dom';
-import logoImage from '../../assets/kilos_logo.png';
+import defaultGymLogo from '../../assets/deep_fitness_icon.png';
 
 function BranchSwitcher({ gymBranches, activeGymId, switchBranch }) {
   const [open, setOpen] = useState(false);
@@ -27,9 +27,6 @@ function BranchSwitcher({ gymBranches, activeGymId, switchBranch }) {
         <div className="flex flex-col items-center leading-tight">
           <span className="font-bold text-slate-900 dark:text-white text-sm md:text-base tracking-tight whitespace-nowrap">
             {activeBranch?.name || 'Branch'}
-          </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tracking-wider uppercase hidden sm:block">
-            powered by Kilos
           </span>
         </div>
         <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400">
@@ -103,7 +100,8 @@ export default function Topbar() {
 
   const displayName = userName || currentUser?.email?.split('@')[0] || 'User';
   const roleLabel = role === 'admin' ? 'Admin' : role === 'staff' ? 'Staff' : role || 'User';
-  const gymName = gymData?.name || 'Kilos';
+  const gymName = gymData?.name || 'DEEP FITNESS';
+  const gymLogoUrl = gymData?.logoUrl || null;
   const isMultiBranch = isImpersonating ? impersonatedBranches.length > 1 : gymIds.length > 1;
 
   const handleImpersonatedSwitch = (newGymId) => {
@@ -116,8 +114,12 @@ export default function Topbar() {
       {/* Left — logo (mobile only) */}
       <div className="flex items-center gap-2 md:min-w-0">
         <div className="flex md:hidden items-center gap-2 shrink-0">
-          <div className="w-7 h-7 rounded-lg overflow-hidden bg-primary-container/10 flex items-center justify-center">
-            <img src={logoImage} alt="Kilos" className="w-full h-full object-contain" />
+          <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-900 border border-amber-500/30 flex items-center justify-center">
+            {gymLogoUrl ? (
+              <img src={gymLogoUrl} alt={gymName} className="w-full h-full object-contain" />
+            ) : (
+              <img src={defaultGymLogo} alt={gymName} className="w-full h-full object-contain" />
+            )}
           </div>
         </div>
         {/* Date pill — desktop only */}
@@ -138,7 +140,6 @@ export default function Topbar() {
         ) : (
           <div className="flex flex-col items-center leading-tight pointer-events-none">
             <span className="font-bold text-slate-900 dark:text-white text-sm md:text-base tracking-tight whitespace-nowrap">{gymName}</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tracking-wider uppercase hidden sm:block">powered by Kilos</span>
           </div>
         )}
       </div>

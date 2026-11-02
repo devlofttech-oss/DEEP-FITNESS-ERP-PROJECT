@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { LogIn } from 'lucide-react'
+import logoImage from '../assets/deep_fitness_logo.png'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -33,8 +34,11 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-surface dark:bg-slate-900 p-4 font-['Plus_Jakarta_Sans']">
       <div className="bg-surface-container-lowest dark:bg-slate-950 w-full max-w-md p-8 md:p-10 rounded-3xl shadow-[0_20px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.4)] border border-outline-variant/30 flex flex-col items-center">
         
-        <h1 className="text-3xl font-extrabold text-on-surface text-center mb-1 tracking-tight">Kilos</h1>
-        <p className="text-primary font-medium text-center text-sm mb-1">by Devloft Technologies</p>
+        <div className="w-24 h-24 mb-4 rounded-2xl overflow-hidden border border-amber-500/30 bg-slate-900 flex items-center justify-center shadow-lg">
+          <img src={logoImage} alt="DEEP FITNESS" className="w-full h-full object-contain" />
+        </div>
+        <h1 className="text-3xl font-extrabold text-on-surface text-center mb-1 tracking-tight">DEEP FITNESS</h1>
+        <p className="text-primary font-medium text-center text-sm mb-1">Management Portal</p>
         <p className="text-on-surface-variant text-center mb-8 text-sm mt-3">Sign in to your management dashboard</p>
 
         {inactiveGymError && (
@@ -56,12 +60,11 @@ export default function Login() {
             <input
               id="login-email"
               type="email"
-              className="w-full px-4 py-3 rounded-xl bg-surface-container border border-outline-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface outline-none transition-all"
-              placeholder="admin@deepfitness.com"
+              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
-              autoFocus
+              placeholder="deepfitnessgym2025@gmail.com"
+              className="w-full px-4 py-3 rounded-xl border border-outline-variant/40 bg-surface dark:bg-slate-900 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all text-sm"
             />
           </div>
 
@@ -71,19 +74,18 @@ export default function Login() {
               <input
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
-                className="w-full px-4 py-3 pr-12 rounded-xl bg-surface-container border border-outline-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface outline-none transition-all"
-                placeholder="••••••••"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
+                placeholder="••••••••"
+                className="w-full px-4 py-3 rounded-xl border border-outline-variant/40 bg-surface dark:bg-slate-900 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all text-sm pr-10"
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors"
-                tabIndex={-1}
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface p-1"
               >
-                <span className="material-symbols-outlined text-[20px]">
+                <span className="material-symbols-outlined text-[18px]">
                   {showPassword ? 'visibility_off' : 'visibility'}
                 </span>
               </button>
@@ -92,34 +94,22 @@ export default function Login() {
 
           <button
             type="submit"
-            className="w-full mt-2 bg-primary hover:bg-primary/90 text-on-primary font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-70"
             disabled={loading}
-            id="login-submit"
+            className="w-full py-3.5 px-4 bg-primary text-on-primary font-semibold rounded-xl hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all flex items-center justify-center gap-2 mt-2 shadow-sm disabled:opacity-50 cursor-pointer"
           >
             {loading ? (
-              <span className="material-symbols-outlined animate-spin">progress_activity</span>
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                <LogIn size={20} />
-                Sign In
+                <LogIn className="w-4 h-4" />
+                <span>Sign In</span>
               </>
             )}
           </button>
         </form>
 
-        <div className="mt-8 flex flex-col items-center gap-1 opacity-70">
-          <p className="text-center text-xs text-on-surface-variant">
-            Developed by DevLoft Tech
-          </p>
-          <a 
-            href="https://www.devlofttech.com/" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs text-primary dark:text-amber-100 hover:text-primary/80 dark:hover:text-amber-50 transition-colors font-medium"
-          >
-            <span className="material-symbols-outlined text-[14px]">language</span>
-            Visit Website
-          </a>
+        <div className="mt-8 text-center text-xs text-on-surface-variant">
+          Developed by Devloft Tech
         </div>
       </div>
     </div>
