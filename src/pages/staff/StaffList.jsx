@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { firebaseConfig } from '../../firebase/config';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { updateStaffCredentials } from '../../utils/staffApi';
 import toast from 'react-hot-toast';
 import { certifications, commissionType, commissionPercent, staffAuthUid } from '../../utils/compat';
 
@@ -31,13 +32,15 @@ function randomPassword() {
     + '#' + Math.floor(Math.random() * 90 + 10);
 }
 
-function StaffModal({ initial, onSave, onClose, gymId }) {
+function StaffModal({ initial, onSave, onClose, gymId, onCredentialsSaved }) {
   const [form, setForm] = useState(initial || EMPTY_FORM);
   const [createLogin, setCreateLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState(initial?.email || '');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [accessLevel, setAccessLevel] = useState(initial?.accessLevel || 'staff');
+  const [newPassword, setNewPassword] = useState('');
+  const [savingCreds, setSavingCreds] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const handle = (e) => {
@@ -68,9 +71,12 @@ function StaffModal({ initial, onSave, onClose, gymId }) {
         await setDocument('users', authUid, { role: accessLevel, name: form.name, email: loginEmail, gymId });
         toast.success(`Login created for ${loginEmail}`);
       }
-      // When editing a staff member with existing login, update their email in Firestore
-      if (isEdit && initial?.authUid && loginEmail && loginEmail !== initial.loginEmail) {
-        await updateDocumentFlat('users', initial.authUid, { email: loginEmail, name: form.name });
+      // Keep the login profile's display name in step with the staff record.
+      // The login EMAIL is deliberately not written here: changing it in
+      // Firestore alone would leave the real Firebase Auth account on the old
+      // address, so that goes through "Update Credentials" (Admin SDK) instead.
+      if (isEdit && initial?.authUid && form.name && form.name !== initial.name) {
+        await updateDocumentFlat('users', initial.authUid, { name: form.name });
       }
       await onSave({ ...form, ...(authUid && { authUid, loginEmail, accessLevel }) });
     } catch (err) {
@@ -87,6 +93,40 @@ function StaffModal({ initial, onSave, onClose, gymId }) {
       toast.error(msg, { duration: 6000 });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Changing another user's email or password needs the Admin SDK, so this
+  // goes through the serverless endpoint rather than the browser SDK.
+  const saveCredentials = async () => {
+    const email = loginEmail.trim();
+    if (!email) { toast.error('Login email cannot be empty'); return; }
+    if (newPassword && newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+
+    const emailChanged = email !== (initial?.loginEmail || initial?.email || '');
+    const levelChanged = accessLevel !== (initial?.accessLevel || 'staff');
+    if (!emailChanged && !levelChanged && !newPassword) {
+      toast('Nothing to update'); return;
+    }
+
+    setSavingCreds(true);
+    try {
+      await updateStaffCredentials({
+        gymId,
+        staffId: initial?.staffId,
+        authUid: initial.authUid,
+        ...(emailChanged && { email }),
+        ...(newPassword && { password: newPassword }),
+        ...(levelChanged && { accessLevel }),
+      });
+      setNewPassword('');
+      toast.success('Credentials updated');
+      onCredentialsSaved?.();
+    } catch (err) {
+      console.error('Credential update failed:', err);
+      toast.error(err?.message || 'Could not update credentials', { duration: 6000 });
+    } finally {
+      setSavingCreds(false);
     }
   };
 
@@ -232,8 +272,38 @@ function StaffModal({ initial, onSave, onClose, gymId }) {
                     placeholder="staff@email.com"
                     className="w-full px-4 py-2.5 bg-surface-container border border-outline-variant/30 rounded-lg text-on-surface outline-none focus:border-primary" />
                 </div>
-                <div className="flex items-center justify-between gap-3 pt-1">
-                  <p className="text-xs text-on-surface-variant">To change the password, send a reset link to the staff email.</p>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-on-surface-variant">New Password</label>
+                  <div className="relative">
+                    <input type={showLoginPassword ? 'text' : 'password'} value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)} minLength={6} autoComplete="new-password"
+                      placeholder="Leave blank to keep the current password"
+                      className="w-full px-4 py-2.5 pr-11 bg-surface-container border border-outline-variant/30 rounded-lg text-on-surface outline-none focus:border-primary" />
+                    <button type="button" onClick={() => setShowLoginPassword(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors" tabIndex={-1}>
+                      <span className="material-symbols-outlined text-[20px]">{showLoginPassword ? 'visibility_off' : 'visibility'}</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-on-surface-variant">Set it directly and tell the staff member — no reset link needed.</span>
+                    <button type="button"
+                      onClick={() => { setNewPassword(randomPassword()); setShowLoginPassword(true); }}
+                      className="text-[11px] font-semibold text-primary hover:underline shrink-0">
+                      Generate
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-on-surface-variant">Access Level</label>
+                  <select value={accessLevel} onChange={e => setAccessLevel(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-surface-container border border-outline-variant/30 rounded-lg text-on-surface outline-none focus:border-primary appearance-none">
+                    {ACCESS_LEVELS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                  </select>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
                   <button
                     type="button"
                     onClick={async () => {
@@ -241,12 +311,26 @@ function StaffModal({ initial, onSave, onClose, gymId }) {
                       try {
                         await sendPasswordResetEmail(getAuth(), loginEmail);
                         toast.success('Password reset email sent!');
-                      } catch { toast.error('Failed to send reset email'); }
+                      } catch (err) {
+                        console.error('Password reset failed:', err);
+                        toast.error(err?.message || 'Failed to send reset email');
+                      }
                     }}
-                    className="shrink-0 px-3 py-1.5 bg-surface-container border border-outline-variant/30 rounded-lg text-sm font-medium text-on-surface hover:bg-surface-container-high transition-colors flex items-center gap-1.5"
+                    className="px-3 py-1.5 bg-surface-container border border-outline-variant/30 rounded-lg text-sm font-medium text-on-surface hover:bg-surface-container-high transition-colors flex items-center gap-1.5"
                   >
                     <span className="material-symbols-outlined text-[14px]">mail</span>
-                    Send Reset
+                    Send Reset Link
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingCreds}
+                    onClick={saveCredentials}
+                    className="px-3 py-1.5 bg-primary text-on-primary rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                  >
+                    <span className={`material-symbols-outlined text-[14px] ${savingCreds ? 'animate-spin' : ''}`}>
+                      {savingCreds ? 'progress_activity' : 'key'}
+                    </span>
+                    {savingCreds ? 'Updating…' : 'Update Credentials'}
                   </button>
                 </div>
               </div>
@@ -536,9 +620,11 @@ export default function StaffList() {
             certifications: certifications(editingStaff.certifications), commissionType: commissionType(editingStaff.commissionType),
             commissionPercent: commissionPercent(editingStaff),
             authUid: staffAuthUid(editingStaff),
+            staffId: editingStaff.id,
             accessLevel: editingStaff.accessLevel || 'staff',
             loginEmail: editingStaff.email || '' }}
           onSave={handleEdit}
+          onCredentialsSaved={fetchStaff}
           onClose={() => setEditingStaff(null)}
         />
       )}
