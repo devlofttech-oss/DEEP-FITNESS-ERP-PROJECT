@@ -24,6 +24,6 @@ export const BRAND_WORDMARK = absolute(wordmarkAsset);
 // washes out, so it needs a dark tile behind it.
 export const BRAND_MARK_ON_DARK = true;
 
-// The full logo (helmet + "DEEP FITNESS MYSORE") is tone-corrected for a light
-// page, so it sits on the receipt as plain transparent artwork — no tile.
-export const BRAND_WORDMARK_ON_DARK = false;
+// The full logo (helmet + "DEEP FITNESS MYSORE") keeps its original gold tones,
+// which only read against a dark backing — so the receipt sets it on a dark panel.
+export const BRAND_WORDMARK_ON_DARK = true;
