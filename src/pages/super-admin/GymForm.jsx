@@ -6,7 +6,7 @@ import { firebaseConfig } from '../../firebase/config';
 import { getDocument, getCollection, createDocument, updateDocument, setDocument } from '../../firebase/db';
 import { increment } from 'firebase/firestore';
 import { setTenantDocument } from '../../firebase/tenantDb';
-import { uploadGymLogo } from '../../utils/imagekit';
+import { uploadGymLogoSafe } from '../../utils/photoStorage';
 import toast from 'react-hot-toast';
 
 const DEFAULT_CATEGORIES = [
@@ -112,7 +112,7 @@ export default function GymForm() {
       // Upload logo if selected
       let logoUrl = existingLogoUrl;
       if (logoFile) {
-        logoUrl = await uploadGymLogo(logoFile);
+        logoUrl = await uploadGymLogoSafe(logoFile);
       }
 
       if (isEdit) {

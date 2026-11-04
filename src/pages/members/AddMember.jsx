@@ -5,7 +5,8 @@ import { getTenantDocument, getTenantCollection, createTenantDocument, updateTen
 import toast from 'react-hot-toast';
 import PhotoUpload from '../../components/ui/PhotoUpload';
 import MemberQRModal from '../../components/ui/MemberQRModal';
-import { uploadMemberPhoto, uploadMemberDocument } from '../../utils/imagekit';
+import { uploadMemberDocument } from '../../utils/imagekit';
+import { uploadMemberPhotoSafe } from '../../utils/photoStorage';
 import { planType } from '../../utils/compat';
 
 const TYPE_LABELS = {
@@ -226,7 +227,7 @@ export default function AddMember() {
       let finalPhotoUrl = photoUrl;
       if (photoFile) {
         try {
-          finalPhotoUrl = await uploadMemberPhoto(photoFile);
+          finalPhotoUrl = await uploadMemberPhotoSafe(photoFile);
         } catch (err) {
           toast.error(err?.message ? `Photo upload failed: ${err.message}` : 'Photo upload failed');
           setLoading(false);
