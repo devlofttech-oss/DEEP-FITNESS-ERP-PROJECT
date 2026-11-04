@@ -56,8 +56,12 @@ function section(icon, title, rows) {
  * @param {object}  opts.gymInfo  { name, location, contact }
  * @param {object}  opts.member   member document
  * @param {object} [opts.payment] optional payment row this receipt is for
+ * @param {string} [opts.logoUrl] absolute URL of the logo for the header mark
+ * @param {boolean} [opts.logoOnDark] true when that logo needs a dark backing
  */
-export function buildReceiptHtml({ gymInfo = {}, member = {}, payment = null } = {}) {
+export function buildReceiptHtml({ gymInfo = {}, member = {}, payment = null, logoUrl = '', logoOnDark = false } = {}) {
+  const mark = logoUrl || gymInfo.logoUrl || '';
+  const markDark = mark === logoUrl ? logoOnDark : false;
   const [nameMain, nameAccent] = splitName(gymInfo.name || 'Deep Fitness Gym');
   const subLine = [gymInfo.location, gymInfo.contact].filter(Boolean).map(esc).join('&nbsp; | &nbsp;');
 
@@ -110,9 +114,12 @@ export function buildReceiptHtml({ gymInfo = {}, member = {}, payment = null } =
 
   /* ── header ── */
   .head{display:flex;align-items:center;gap:7mm}
-  .mark{width:16mm;height:16mm;border-radius:4.5mm;background:var(--purple);color:#fff;
-        display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .bar{width:1.1mm;height:17mm;background:#15151c;border-radius:1mm;flex-shrink:0}
+  .mark{width:17.5mm;height:17.5mm;border-radius:4.8mm;background:var(--purple);color:#fff;
+        display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+  .mark-dark{background:#16213a}
+  .mark-plain{background:#fff;border:0.3mm solid #e3e0ee}
+  .mark-img{width:100%;height:100%;object-fit:contain;padding:0.9mm}
+  .bar{width:1.1mm;height:17.5mm;background:#15151c;border-radius:1mm;flex-shrink:0}
   .gym-name{font-size:27px;font-weight:800;letter-spacing:-.5px;line-height:1.05;white-space:nowrap}
   .gym-name em{font-style:normal;color:var(--purple)}
   .gym-sub{font-size:11px;color:#3d3d49;margin-top:1.8mm;letter-spacing:.1px;white-space:nowrap}
@@ -182,8 +189,8 @@ export function buildReceiptHtml({ gymInfo = {}, member = {}, payment = null } =
 
   <div class="content">
     <div class="head">
-      <div class="mark">${gymInfo.logoUrl
-        ? `<img src="${esc(gymInfo.logoUrl)}" alt="" style="width:100%;height:100%;object-fit:contain;padding:2mm"/>`
+      <div class="mark${markDark ? ' mark-dark' : mark ? ' mark-plain' : ''}">${mark
+        ? `<img class="mark-img" src="${esc(mark)}" alt=""/>`
         : KETTLEBELL}</div>
       <div class="bar"></div>
       <div>
@@ -235,16 +242,32 @@ export function buildReceiptHtml({ gymInfo = {}, member = {}, payment = null } =
 </body></html>`;
 }
 
-/** Open the receipt in a new window and send it to the printer / PDF export. */
+/** Open the receipt in a new window, optionally sending it straight to print. */
 export function openReceipt(opts, { print = true } = {}) {
   const win = window.open('', '_blank', 'width=860,height=1000');
   if (!win) return false;
   win.document.write(buildReceiptHtml(opts));
   win.document.close();
   win.focus();
+
   if (print) {
-    // give the webfonts a moment so the printed copy is not a fallback face
-    setTimeout(() => { try { win.print(); } catch { /* user closed it */ } }, 900);
+    // Wait for the logo and the webfonts, otherwise the printed copy can come
+    // out with a missing mark or a fallback typeface.
+    const go = () => {
+      const fonts = win.document.fonts?.ready ?? Promise.resolve();
+      const images = Promise.all(
+        [...win.document.images].map(img => (img.complete ? null : new Promise(done => {
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        }))),
+      );
+      Promise.race([
+        Promise.all([fonts, images]),
+        new Promise(done => setTimeout(done, 4000)),
+      ]).then(() => { try { win.print(); } catch { /* user closed it */ } });
+    };
+    if (win.document.readyState === 'complete') go();
+    else win.addEventListener('load', go, { once: true });
   }
   return true;
 }

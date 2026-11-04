@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getDocument } from '../../firebase/db';
 import { buildReceiptHtml } from '../../utils/receipt';
+import { BRAND_MARK, BRAND_MARK_ON_DARK } from '../../utils/brand';
 
 // The branded receipt is authored as a standalone A4 document (src/utils/receipt.js)
 // so the printed copy, the PDF and this shared link are always identical. Here it is
@@ -52,6 +53,8 @@ export default function ReceiptPage() {
         gstPercent: data.gstPercent,
       },
       payment: data.generatedAt ? { date: data.generatedAt } : null,
+      logoUrl: data.gymLogoUrl || BRAND_MARK,
+      logoOnDark: !data.gymLogoUrl && BRAND_MARK_ON_DARK,
     });
   }, [data]);
 
