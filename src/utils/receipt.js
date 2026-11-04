@@ -126,9 +126,12 @@ export function buildReceiptHtml({
   .mark-dark{background:#16213a}
   .mark-plain{background:#fff;border:0.3mm solid #e3e0ee}
   .mark-img{width:100%;height:100%;object-fit:contain;padding:0.9mm}
-  .logo-full{height:26mm;width:auto;flex-shrink:0;display:block;margin:-1mm 0}
+    .logo-full{height:25mm;width:auto;display:block}
+  .logo-panel{background:#16213a;border-radius:3.5mm;padding:2.5mm 4mm;flex-shrink:0;
+              display:flex;align-items:center;justify-content:center}
+  .logo-panel-plain{background:transparent;padding:0}
   .head-text{min-width:0}
-  .bar{width:1.1mm;height:19mm;background:#15151c;border-radius:1mm;flex-shrink:0}
+  .bar{width:1.1mm;height:22mm;background:#15151c;border-radius:1mm;flex-shrink:0}
   .gym-name{font-size:27px;font-weight:800;letter-spacing:-.5px;line-height:1.05;white-space:nowrap}
   .gym-name em{font-style:normal;color:var(--purple)}
   .gym-sub{font-size:11px;color:#3d3d49;margin-top:1.8mm;letter-spacing:.1px;white-space:nowrap}
@@ -199,7 +202,7 @@ export function buildReceiptHtml({
   <div class="content">
     <div class="head">
       ${isWordmark
-        ? `<img class="logo-full" src="${esc(mark)}" alt="${esc(gymInfo.name || '')}"/>`
+        ? `<div class="logo-panel${markDark ? '' : ' logo-panel-plain'}"><img class="logo-full" src="${esc(mark)}" alt="${esc(gymInfo.name || '')}"/></div>`
         : `<div class="mark${markDark ? ' mark-dark' : mark ? ' mark-plain' : ''}">${mark
              ? `<img class="mark-img" src="${esc(mark)}" alt=""/>`
              : KETTLEBELL}</div>`}
