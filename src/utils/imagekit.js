@@ -1,3 +1,35 @@
+/**
+ * Fetch a short-lived upload signature from the serverless auth endpoint.
+ * Reports precisely why it failed — the endpoint is missing under plain
+ * `vite dev` (no /api functions) and 500s when IMAGEKIT_PRIVATE_KEY is unset.
+ */
+async function getUploadAuth() {
+  let res;
+  try {
+    res = await fetch('/api/imagekit-auth');
+  } catch (err) {
+    console.error('ImageKit auth request failed:', err);
+    throw new Error('Could not reach the upload service');
+  }
+
+  const body = await res.text();
+  if (!res.ok) {
+    let reason = `${res.status} ${res.statusText}`;
+    try { reason = JSON.parse(body).error || reason; } catch { /* not JSON */ }
+    console.error('ImageKit auth failed:', reason);
+    throw new Error(res.status === 404
+      ? 'Upload service /api/imagekit-auth is not deployed'
+      : `Upload service error: ${reason}`);
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    // Dev server rewrites unknown /api paths to index.html, which is not JSON.
+    throw new Error('Upload service /api/imagekit-auth is not available here');
+  }
+}
+
 async function compressImage(file) {
   const { default: imageCompression } = await import('browser-image-compression');
   return imageCompression(file, {
@@ -9,12 +41,11 @@ async function compressImage(file) {
 }
 
 export async function uploadToImageKit(file, { folder = '/gym-erp/uploads', prefix = 'upload' } = {}) {
+  if (!import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY) throw new Error('VITE_IMAGEKIT_PUBLIC_KEY is not set');
   const compressed = await compressImage(file);
   const fileName = `${prefix}-${Date.now()}.jpg`;
 
-  const authRes = await fetch('/api/imagekit-auth');
-  if (!authRes.ok) throw new Error('Failed to get upload token');
-  const { token, expire, signature } = await authRes.json();
+  const { token, expire, signature } = await getUploadAuth();
 
   const formData = new FormData();
   formData.append('file', compressed, fileName);
@@ -51,9 +82,7 @@ export async function uploadMemberDocument(file) {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const fileName = `doc-${Date.now()}-${safeName}`;
 
-  const authRes = await fetch('/api/imagekit-auth');
-  if (!authRes.ok) throw new Error('Failed to get upload token');
-  const { token, expire, signature } = await authRes.json();
+  const { token, expire, signature } = await getUploadAuth();
 
   const formData = new FormData();
   formData.append('file', file, fileName);

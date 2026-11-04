@@ -20,12 +20,24 @@ function generateQrId() {
   return 'staff_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
+const ACCESS_LEVELS = [
+  { value: 'staff', label: 'Staff — Check-in & attendance only' },
+  { value: 'admin', label: 'Admin — Full access to everything' },
+];
+
+function randomPassword() {
+  return Math.random().toString(36).slice(-5)
+    + Math.random().toString(36).toUpperCase().slice(-3)
+    + '#' + Math.floor(Math.random() * 90 + 10);
+}
+
 function StaffModal({ initial, onSave, onClose, gymId }) {
   const [form, setForm] = useState(initial || EMPTY_FORM);
   const [createLogin, setCreateLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState(initial?.email || '');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [accessLevel, setAccessLevel] = useState(initial?.accessLevel || 'staff');
   const [saving, setSaving] = useState(false);
 
   const handle = (e) => {
@@ -38,7 +50,7 @@ function StaffModal({ initial, onSave, onClose, gymId }) {
     if (!form.name || !form.phone) { toast.error('Name and phone are required'); return; }
     if (createLogin) {
       if (!loginEmail) { toast.error('Email is required for login access'); return; }
-      if (!initial && loginPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+      if (loginPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
     }
     setSaving(true);
     try {
@@ -53,20 +65,26 @@ function StaffModal({ initial, onSave, onClose, gymId }) {
         } finally {
           await deleteApp(secondaryApp);
         }
-        await setDocument('users', authUid, { role: 'staff', name: form.name, email: loginEmail, gymId });
+        await setDocument('users', authUid, { role: accessLevel, name: form.name, email: loginEmail, gymId });
+        toast.success(`Login created for ${loginEmail}`);
       }
       // When editing a staff member with existing login, update their email in Firestore
       if (isEdit && initial?.authUid && loginEmail && loginEmail !== initial.loginEmail) {
         await updateDocumentFlat('users', initial.authUid, { email: loginEmail, name: form.name });
       }
-      await onSave({ ...form, ...(authUid && { authUid }) });
+      await onSave({ ...form, ...(authUid && { authUid, loginEmail, accessLevel }) });
     } catch (err) {
+      console.error('Saving staff member failed:', err);
       const msg = err.code === 'auth/email-already-in-use'
         ? 'That email already has a login account'
         : err.code === 'auth/invalid-email'
           ? 'Invalid email address'
-          : 'Failed to create login account';
-      toast.error(msg);
+          : err.code === 'auth/weak-password'
+            ? 'Password is too weak — use at least 6 characters'
+            : err.code
+              ? `Failed to create login account (${err.code})`
+              : (err.message || 'Failed to save staff member');
+      toast.error(msg, { duration: 6000 });
     } finally {
       setSaving(false);
     }
@@ -145,8 +163,8 @@ function StaffModal({ initial, onSave, onClose, gymId }) {
             )}
           </div>
 
-          {/* Login Access */}
-          {!isEdit && (
+          {/* Login Access — offered whenever this staff member has no login yet */}
+          {!initial?.authUid && (
             <div className="border-t border-outline-variant/20 pt-4">
               <button type="button" onClick={() => setCreateLogin(v => !v)}
                 className="flex items-center gap-2 text-sm font-medium text-on-surface w-full">
@@ -160,7 +178,7 @@ function StaffModal({ initial, onSave, onClose, gymId }) {
                 <div className="mt-3 grid grid-cols-2 gap-3 p-4 bg-primary/5 rounded-xl border border-primary/20">
                   <div className="col-span-2 flex items-center gap-2 text-xs text-primary font-medium">
                     <span className="material-symbols-outlined text-[16px]">lock</span>
-                    Staff will log in with these credentials and have access to Check-in only.
+                    These are the credentials the staff member will use to sign in.
                   </div>
                   <div className="col-span-2 flex flex-col gap-1.5">
                     <label className="text-sm font-medium text-on-surface-variant">Login Email *</label>
@@ -179,6 +197,21 @@ function StaffModal({ initial, onSave, onClose, gymId }) {
                         <span className="material-symbols-outlined text-[20px]">{showLoginPassword ? 'visibility_off' : 'visibility'}</span>
                       </button>
                     </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-on-surface-variant">Share this with the staff member — it is not stored anywhere.</span>
+                      <button type="button"
+                        onClick={() => { setLoginPassword(randomPassword()); setShowLoginPassword(true); }}
+                        className="text-[11px] font-semibold text-primary hover:underline shrink-0">
+                        Generate
+                      </button>
+                    </div>
+                  </div>
+                  <div className="col-span-2 flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-on-surface-variant">Access Level</label>
+                    <select value={accessLevel} onChange={e => setAccessLevel(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-surface-container border border-outline-variant/30 rounded-lg text-on-surface outline-none focus:border-primary appearance-none">
+                      {ACCESS_LEVELS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                    </select>
                   </div>
                 </div>
               )}
@@ -410,16 +443,17 @@ export default function StaffList() {
                 <th className="p-4 font-label-caps text-label-caps text-on-surface-variant uppercase">Phone</th>
                 <th className="p-4 font-label-caps text-label-caps text-on-surface-variant uppercase">Joining Date</th>
                 <th className="p-4 font-label-caps text-label-caps text-on-surface-variant uppercase">Salary</th>
+                <th className="p-4 font-label-caps text-label-caps text-on-surface-variant uppercase">Login</th>
                 <th className="p-4 font-label-caps text-label-caps text-on-surface-variant uppercase text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="6" className="p-8 text-center text-on-surface-variant">
+                <tr><td colSpan="7" className="p-8 text-center text-on-surface-variant">
                   <span className="material-symbols-outlined animate-spin text-2xl mr-2">progress_activity</span>Loading staff...
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan="6" className="p-12 text-center">
+                <tr><td colSpan="7" className="p-12 text-center">
                   <div className="flex flex-col items-center gap-3 text-on-surface-variant">
                     <span className="material-symbols-outlined text-5xl opacity-40">badge</span>
                     <p className="font-medium">No staff members found</p>
@@ -446,6 +480,20 @@ export default function StaffList() {
                     <td className="p-4 text-sm text-on-surface-variant">{s.phone}</td>
                     <td className="p-4 text-sm text-on-surface-variant">{s.joiningDate || '—'}</td>
                     <td className="p-4 text-sm font-medium text-on-surface">{s.salary ? `₹${Number(s.salary).toLocaleString('en-IN')}` : '—'}</td>
+                    <td className="p-4">
+                      {staffAuthUid(s) ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                          <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                          {s.accessLevel === 'admin' ? 'Admin' : 'Staff'}
+                        </span>
+                      ) : (
+                        <button onClick={() => setEditingStaff(s)}
+                          className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-surface-container text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors">
+                          <span className="material-symbols-outlined text-[13px]">person_add</span>
+                          Create login
+                        </button>
+                      )}
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-2">
                         <Link to={`/staff/${s.id}`}
@@ -488,6 +536,7 @@ export default function StaffList() {
             certifications: certifications(editingStaff.certifications), commissionType: commissionType(editingStaff.commissionType),
             commissionPercent: commissionPercent(editingStaff),
             authUid: staffAuthUid(editingStaff),
+            accessLevel: editingStaff.accessLevel || 'staff',
             loginEmail: editingStaff.email || '' }}
           onSave={handleEdit}
           onClose={() => setEditingStaff(null)}

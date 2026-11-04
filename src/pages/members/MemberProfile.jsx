@@ -5,13 +5,13 @@ import { getTenantDocument, getTenantCollection, createTenantDocument, updateTen
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import PhotoUpload from '../../components/ui/PhotoUpload';
-import kilosLogo from '../../assets/kilos_logo.png';
 import SendWhatsAppModal from '../../components/messaging/SendWhatsAppModal';
 import MeasurementForm from '../measurements/MeasurementForm';
 import { shareQrOnWhatsApp } from '../../utils/memberQr';
 import { unfreezePatch } from '../../utils/membership';
 import { gymInfo as resolveGymInfo } from '../../utils/compat';
 import { publishReceipt, openReceiptWhatsApp } from '../../utils/receiptShare';
+import { openReceipt } from '../../utils/receipt';
 import { openWhatsApp } from '../../utils/whatsapp';
 
 // ── Attendance Calendar ─────────────────────────────────────────────────────
@@ -198,106 +198,10 @@ export default function MemberProfile() {
     });
   };
 
-  const downloadReceipt = () => {
-    const bal = Number(member?.balanceFees || 0);
-    const subLine = [gymInfo.location, gymInfo.contact].filter(Boolean).join('  &nbsp;|&nbsp;  ');
-    const dateStr = new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
-
-    const html = `
-      <html><head><title>Receipt - ${member?.name || 'Member'}</title>
-      <style>
-        * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', Arial, sans-serif; }
-        body { background:#fff; color:#111827; }
-        .receipt { max-width:600px; margin:0 auto; padding:0; }
-
-        .header { background:#4f46e5; color:#fff; padding:24px 28px; display:flex; align-items:center; gap:16px; }
-        .logo-circle { width:52px; height:52px; border-radius:12px; background:rgba(255,255,255,0.95);
-          display:flex; align-items:center; justify-content:center; flex-shrink:0;
-          padding:4px; overflow:hidden; }
-        .logo-circle img { width:100%; height:100%; object-fit:contain; }
-        .gym-name { font-size:20px; font-weight:800; letter-spacing:1px; }
-        .gym-sub  { font-size:11px; color:rgba(255,255,255,0.75); margin-top:3px; }
-        .receipt-label { margin-left:auto; text-align:right; }
-        .receipt-label span { display:block; font-size:10px; color:rgba(255,255,255,0.65); font-weight:600; letter-spacing:1px; }
-        .receipt-label .date { font-size:11px; font-weight:400; margin-top:2px; }
-
-        .body { padding:28px; }
-        .section { margin-bottom:20px; }
-        .section-title { font-size:9px; font-weight:700; color:#6366f1; letter-spacing:1.5px;
-          text-transform:uppercase; margin-bottom:10px; }
-        .row { display:flex; justify-content:space-between; align-items:baseline;
-          padding:8px 0; border-bottom:1px solid #f3f4f6; }
-        .row:last-child { border-bottom:none; }
-        .row .label { font-size:12px; color:#9ca3af; }
-        .row .value { font-size:13px; font-weight:700; color:#111827; }
-        .value.green  { color:#059669; }
-        .value.red    { color:#dc2626; }
-        .bal-row { background:#fff1f2; border-radius:6px; padding:8px 10px; margin:0 -10px; }
-
-        hr.section-divider { border:none; border-top:1px solid #e5e7eb; margin:4px 0 20px; }
-
-        .footer { text-align:center; padding:20px 28px 28px; border-top:1px solid #e5e7eb;
-          color:#9ca3af; font-size:10px; line-height:1.8; }
-
-        @media print {
-          body * { visibility:hidden; }
-          #receipt-print, #receipt-print * { visibility:visible; }
-          #receipt-print { position:fixed; top:0; left:0; width:100%; }
-        }
-      </style></head>
-      <body><div class="receipt" id="receipt-print">
-        <div class="header">
-          <div class="logo-circle"><img src="${window.location.origin}${kilosLogo}" alt="Kilos" /></div>
-          <div>
-            <div class="gym-name">${gymInfo.name || 'Kilos'}</div>
-            ${subLine ? `<div class="gym-sub">${subLine}</div>` : ''}
-          </div>
-          <div class="receipt-label">
-            <span>MEMBERSHIP RECEIPT</span>
-            <span class="date">${dateStr}</span>
-          </div>
-        </div>
-
-        <div class="body">
-          <div class="section">
-            <div class="section-title">Member Details</div>
-            <div class="row"><span class="label">Name</span><span class="value">${member?.name || 'N/A'}</span></div>
-            <div class="row"><span class="label">Phone</span><span class="value">${member?.phone || 'N/A'}</span></div>
-          </div>
-          <hr class="section-divider"/>
-
-          <div class="section">
-            <div class="section-title">Plan Details</div>
-            <div class="row"><span class="label">Membership Plan</span><span class="value">${member?.planName || 'N/A'}</span></div>
-            <div class="row"><span class="label">Plan Active From</span><span class="value">${member?.planActiveFrom || 'N/A'}</span></div>
-            <div class="row"><span class="label">Valid Until (Expiry)</span><span class="value">${member?.expiryDate || 'N/A'}</span></div>
-          </div>
-          <hr class="section-divider"/>
-
-          <div class="section">
-            <div class="section-title">Payment Summary</div>
-            <div class="row"><span class="label">Total Fees</span><span class="value">&#8377;${Number(member?.totalFees || 0).toLocaleString('en-IN')}</span></div>
-            ${member?.gstPercent > 0 ? `<div class="row"><span class="label">GST (${member.gstPercent}%)</span><span class="value">&#8377;${(Number(member.totalFees || 0) * member.gstPercent / 100).toLocaleString('en-IN')}</span></div>` : ''}
-            <div class="row"><span class="label">Amount Paid</span><span class="value green">&#8377;${Number(member?.paidFees || 0).toLocaleString('en-IN')}</span></div>
-            <div class="row ${bal > 0 ? 'bal-row' : ''}">
-              <span class="label">Balance Due</span>
-              <span class="value ${bal > 0 ? 'red' : 'green'}">&#8377;${bal.toLocaleString('en-IN')}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="footer">
-          Thank you for choosing ${gymInfo.name || 'Kilos'}!<br/>
-          Generated: ${new Date().toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', year: 'numeric', month: 'short', day: 'numeric' })}
-        </div>
-      </div></body></html>
-    `;
-
-    const win = window.open('', '_blank', 'width=700,height=900');
-    if (!win) { toast.error('Allow popups to view the receipt'); return; }
-    win.document.write(html);
-    win.document.close();
-    win.focus();
+  const downloadReceipt = (print = false) => {
+    const latestPayment = payments?.[0] || null;
+    const ok = openReceipt({ gymInfo, member, payment: latestPayment }, { print });
+    if (!ok) toast.error('Allow pop-ups for this site to open the receipt');
   };
 
   const [sendingReceipt, setSendingReceipt] = useState(false);
@@ -649,7 +553,7 @@ export default function MemberProfile() {
               Chat
             </button>
           )}
-          <button onClick={downloadReceipt} className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5 text-sm">
+          <button onClick={() => downloadReceipt(false)} className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5 text-sm">
             <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
             View Receipt
           </button>

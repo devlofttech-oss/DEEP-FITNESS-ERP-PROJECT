@@ -1,24 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getDocument } from '../../firebase/db';
-import kilosLogo from '../../assets/kilos_logo.png';
+import { buildReceiptHtml } from '../../utils/receipt';
 
-function fmt(n) { return Number(n || 0).toLocaleString('en-IN'); }
-
-function Row({ label, value, green, red }) {
-  return (
-    <div className="flex justify-between items-baseline py-2.5 border-b border-gray-100 last:border-0">
-      <span className="text-xs text-gray-400 font-medium">{label}</span>
-      <span className={`text-sm font-bold ${green ? 'text-emerald-600' : red ? 'text-rose-600' : 'text-gray-900'}`}>{value}</span>
-    </div>
-  );
-}
+// The branded receipt is authored as a standalone A4 document (src/utils/receipt.js)
+// so the printed copy, the PDF and this shared link are always identical. Here it is
+// rendered in an iframe and scaled down to whatever width the phone gives us.
+const PAGE_W = 794;   // 210mm @96dpi
+const PAGE_H = 1123;  // 297mm @96dpi
 
 export default function ReceiptPage() {
   const { receiptId } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [scale, setScale] = useState(1);
+  const holderRef = useRef(null);
+  const frameRef = useRef(null);
 
   useEffect(() => {
     getDocument('receipts', receiptId)
@@ -27,9 +25,39 @@ export default function ReceiptPage() {
       .finally(() => setLoading(false));
   }, [receiptId]);
 
+  useEffect(() => {
+    const fit = () => {
+      const w = holderRef.current?.clientWidth;
+      if (w) setScale(Math.min(1, w / PAGE_W));
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [data]);
+
+  const html = useMemo(() => {
+    if (!data) return '';
+    return buildReceiptHtml({
+      gymInfo: { name: data.gymName, location: data.gymAddress, contact: data.gymPhone, logoUrl: data.gymLogoUrl },
+      member: {
+        name: data.memberName,
+        phone: data.memberPhone,
+        membershipId: data.membershipId,
+        planName: data.planName,
+        planActiveFrom: data.planActiveFrom,
+        expiryDate: data.expiryDate,
+        totalFees: data.totalFees,
+        paidFees: data.paidFees,
+        balanceFees: data.balanceFees,
+        gstPercent: data.gstPercent,
+      },
+      payment: data.generatedAt ? { date: data.generatedAt } : null,
+    });
+  }, [data]);
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-violet-200 border-t-violet-700 rounded-full animate-spin" />
     </div>
   );
 
@@ -41,76 +69,33 @@ export default function ReceiptPage() {
     </div>
   );
 
-  const bal = Number(data.balanceFees || 0);
-  const gstAmt = data.gstPercent > 0 ? Number(data.totalFees || 0) * data.gstPercent / 100 : 0;
-  const generated = data.generatedAt
-    ? new Date(data.generatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
-    : '';
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-start justify-center p-4 pt-8">
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden">
-
-        {/* Header */}
-        <div className="bg-indigo-600 px-6 py-5 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0 overflow-hidden p-1">
-            {data.gymLogoUrl
-              ? <img src={data.gymLogoUrl} alt={data.gymName} className="w-full h-full object-contain" />
-              : <img src={kilosLogo} alt="Kilos" className="w-full h-full object-contain" />
-            }
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-white font-bold text-base truncate">{data.gymName || 'Kilos'}</div>
-            {(data.gymAddress || data.gymPhone) && (
-              <div className="text-indigo-200 text-xs mt-0.5 truncate">
-                {[data.gymAddress, data.gymPhone].filter(Boolean).join(' · ')}
-              </div>
-            )}
-          </div>
-          <div className="text-right shrink-0">
-            <div className="text-[10px] text-indigo-300 font-semibold uppercase tracking-wider">Receipt</div>
-            <div className="text-indigo-200 text-xs mt-0.5">{generated}</div>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-violet-50 to-purple-100 flex flex-col items-center p-3 sm:p-6 gap-4">
+      <div ref={holderRef} className="w-full max-w-[794px]">
+        <div
+          className="rounded-xl overflow-hidden shadow-2xl bg-white mx-auto"
+          style={{ width: PAGE_W * scale, height: PAGE_H * scale }}
+        >
+          <iframe
+            ref={frameRef}
+            title="Membership receipt"
+            srcDoc={html}
+            scrolling="no"
+            style={{
+              width: PAGE_W, height: PAGE_H, border: 0,
+              transform: `scale(${scale})`, transformOrigin: 'top left',
+            }}
+          />
         </div>
-
-        <div className="px-5 py-4 flex flex-col gap-5">
-
-          {/* Member */}
-          <div>
-            <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">Member Details</div>
-            <Row label="Name"  value={data.memberName  || '—'} />
-            <Row label="Phone" value={data.memberPhone || '—'} />
-            {data.membershipId && <Row label="Membership ID" value={data.membershipId} />}
-          </div>
-
-          {/* Plan */}
-          <div>
-            <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">Plan Details</div>
-            <Row label="Plan"        value={data.planName      || '—'} />
-            <Row label="Active From" value={data.planActiveFrom || '—'} />
-            <Row label="Valid Until" value={data.expiryDate     || '—'} />
-          </div>
-
-          {/* Payment */}
-          <div>
-            <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">Payment Summary</div>
-            <Row label="Total Fees" value={`₹${fmt(data.totalFees)}`} />
-            {gstAmt > 0 && <Row label={`GST (${data.gstPercent}%)`} value={`₹${fmt(gstAmt)}`} />}
-            <Row label="Amount Paid"  value={`₹${fmt(data.paidFees)}`}  green />
-            <div className={bal > 0 ? 'rounded-lg px-2 -mx-2 bg-rose-50' : ''}>
-              <Row label="Balance Due" value={`₹${fmt(bal)}`} red={bal > 0} green={bal === 0} />
-            </div>
-          </div>
-
-        </div>
-
-        {/* Footer */}
-        <div className="text-center px-5 pb-6 pt-1 border-t border-gray-100">
-          <p className="text-xs text-gray-400">Thank you for choosing <span className="font-semibold text-gray-500">{data.gymName || 'us'}</span>! 💪</p>
-          <p className="text-[10px] text-gray-300 mt-1">Powered by Kilos · {generated}</p>
-        </div>
-
       </div>
+
+      <button
+        onClick={() => frameRef.current?.contentWindow?.print()}
+        className="flex items-center gap-2 bg-violet-700 hover:bg-violet-800 text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg transition-colors"
+      >
+        <span className="material-symbols-outlined text-[18px]">download</span>
+        Download / Print
+      </button>
     </div>
   );
 }

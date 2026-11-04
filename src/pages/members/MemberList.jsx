@@ -12,7 +12,8 @@ function paginationPages(page, total) {
   return pages;
 }
 import { useAuth } from '../../context/AuthContext';
-import { getTenantCollection } from '../../firebase/tenantDb';
+import { getTenantCollection, updateTenantDocument } from '../../firebase/tenantDb';
+import AvatarUpload from '../../components/ui/AvatarUpload';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import SendWhatsAppModal from '../../components/messaging/SendWhatsAppModal';
@@ -29,6 +30,18 @@ function daysUntilExpiry(expiryDate) {
 
 export default function MemberList() {
   const { gymId } = useAuth();
+
+  const handlePhotoUpload = async (memberId, url) => {
+    try {
+      await updateTenantDocument(gymId, 'members', memberId, { photoUrl: url });
+      setMembers(prev => prev.map(m => (m.id === memberId ? { ...m, photoUrl: url } : m)));
+      setAbsentees(prev => prev.map(m => (m.id === memberId ? { ...m, photoUrl: url } : m)));
+      toast.success('Photo updated!');
+    } catch (err) {
+      console.error('Could not save member photo:', err);
+      toast.error('Photo uploaded but could not be saved. Please try again.', { duration: 6000 });
+    }
+  };
   const navigate = useNavigate();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -347,12 +360,13 @@ export default function MemberList() {
                 return (
                   <div key={member.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-lg shrink-0 overflow-hidden">
-                        {member.photoUrl
-                          ? <img src={member.photoUrl} alt={member.name} className="w-full h-full object-cover" />
-                          : (member.name?.charAt(0) || '?')
-                        }
-                      </div>
+                      <AvatarUpload
+                        photoUrl={member.photoUrl}
+                        name={member.name}
+                        onUpload={(url) => handlePhotoUpload(member.id, url)}
+                        size="w-11 h-11"
+                        colors="bg-orange-100 text-orange-600 text-lg"
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-on-surface truncate">{member.name}</div>
                         <div className="text-xs text-on-surface-variant">{member.phone}</div>
@@ -420,9 +434,11 @@ export default function MemberList() {
               <div key={member.id} onClick={() => navigate(`/members/${member.id}`)} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 cursor-pointer active:scale-[0.98] transition-transform">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold shrink-0 overflow-hidden">
-                      {member.photoUrl ? <img src={member.photoUrl} alt={member.name} className="w-full h-full object-cover" /> : (member.name?.charAt(0) || '?')}
-                    </div>
+                    <AvatarUpload
+                      photoUrl={member.photoUrl}
+                      name={member.name}
+                      onUpload={(url) => handlePhotoUpload(member.id, url)}
+                    />
                     <div>
                       <div className="font-semibold text-on-surface">{member.name}</div>
                       <div className="text-sm text-on-surface-variant">{member.phone}</div>
@@ -518,12 +534,11 @@ export default function MemberList() {
                     <tr key={member.id} onClick={() => navigate(`/members/${member.id}`)} className="border-b border-outline-variant/20 hover:bg-surface-container/40 transition-colors cursor-pointer">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold shrink-0 overflow-hidden">
-                            {member.photoUrl
-                              ? <img src={member.photoUrl} alt={member.name} className="w-full h-full object-cover" />
-                              : (member.name?.charAt(0) || '?')
-                            }
-                          </div>
+                          <AvatarUpload
+                            photoUrl={member.photoUrl}
+                            name={member.name}
+                            onUpload={(url) => handlePhotoUpload(member.id, url)}
+                          />
                           <div>
                             <div className="font-medium text-on-surface">{member.name}</div>
                             {member.email && (

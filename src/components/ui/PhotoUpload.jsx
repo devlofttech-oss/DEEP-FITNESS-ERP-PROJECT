@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { uploadMemberPhoto } from '../../utils/imagekit';
+import { uploadMemberPhotoSafe } from '../../utils/photoStorage';
 import toast from 'react-hot-toast';
 
 // `onUpload`     — immediate mode: uploads to ImageKit now and returns the URL.
@@ -24,10 +24,11 @@ export default function PhotoUpload({ onUpload, onSelectFile, onDelete, hasPhoto
 
     setUploading(true);
     try {
-      const url = await uploadMemberPhoto(file);
-      onUpload(url);
+      const url = await uploadMemberPhotoSafe(file);
+      await onUpload(url);
     } catch (err) {
-      toast.error(err?.message ? `Photo upload failed: ${err.message}` : 'Photo upload failed');
+      console.error('Photo upload failed:', err);
+      toast.error(err?.message ? `Photo upload failed: ${err.message}` : 'Photo upload failed', { duration: 6000 });
     } finally {
       setUploading(false);
       e.target.value = '';
