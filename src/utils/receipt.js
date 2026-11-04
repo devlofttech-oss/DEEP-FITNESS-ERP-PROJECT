@@ -58,10 +58,17 @@ function section(icon, title, rows) {
  * @param {object} [opts.payment] optional payment row this receipt is for
  * @param {string} [opts.logoUrl] absolute URL of the logo for the header mark
  * @param {boolean} [opts.logoOnDark] true when that logo needs a dark backing
+ * @param {'mark'|'wordmark'} [opts.logoVariant] 'wordmark' when the artwork already
+ *        carries the gym's name, so the header does not repeat it as text
  */
-export function buildReceiptHtml({ gymInfo = {}, member = {}, payment = null, logoUrl = '', logoOnDark = false } = {}) {
+export function buildReceiptHtml({
+  gymInfo = {}, member = {}, payment = null,
+  logoUrl = '', logoOnDark = false, logoVariant = 'mark',
+} = {}) {
   const mark = logoUrl || gymInfo.logoUrl || '';
-  const markDark = mark === logoUrl ? logoOnDark : false;
+  const usingPassedLogo = Boolean(logoUrl) && mark === logoUrl;
+  const markDark = usingPassedLogo ? logoOnDark : false;
+  const isWordmark = usingPassedLogo && logoVariant === 'wordmark';
   const [nameMain, nameAccent] = splitName(gymInfo.name || 'Deep Fitness Gym');
   const subLine = [gymInfo.location, gymInfo.contact].filter(Boolean).map(esc).join('&nbsp; | &nbsp;');
 
@@ -119,7 +126,9 @@ export function buildReceiptHtml({ gymInfo = {}, member = {}, payment = null, lo
   .mark-dark{background:#16213a}
   .mark-plain{background:#fff;border:0.3mm solid #e3e0ee}
   .mark-img{width:100%;height:100%;object-fit:contain;padding:0.9mm}
-  .bar{width:1.1mm;height:17.5mm;background:#15151c;border-radius:1mm;flex-shrink:0}
+  .logo-full{height:26mm;width:auto;flex-shrink:0;display:block;margin:-1mm 0}
+  .head-text{min-width:0}
+  .bar{width:1.1mm;height:19mm;background:#15151c;border-radius:1mm;flex-shrink:0}
   .gym-name{font-size:27px;font-weight:800;letter-spacing:-.5px;line-height:1.05;white-space:nowrap}
   .gym-name em{font-style:normal;color:var(--purple)}
   .gym-sub{font-size:11px;color:#3d3d49;margin-top:1.8mm;letter-spacing:.1px;white-space:nowrap}
@@ -189,11 +198,13 @@ export function buildReceiptHtml({ gymInfo = {}, member = {}, payment = null, lo
 
   <div class="content">
     <div class="head">
-      <div class="mark${markDark ? ' mark-dark' : mark ? ' mark-plain' : ''}">${mark
-        ? `<img class="mark-img" src="${esc(mark)}" alt=""/>`
-        : KETTLEBELL}</div>
+      ${isWordmark
+        ? `<img class="logo-full" src="${esc(mark)}" alt="${esc(gymInfo.name || '')}"/>`
+        : `<div class="mark${markDark ? ' mark-dark' : mark ? ' mark-plain' : ''}">${mark
+             ? `<img class="mark-img" src="${esc(mark)}" alt=""/>`
+             : KETTLEBELL}</div>`}
       <div class="bar"></div>
-      <div>
+      <div class="head-text">
         <div class="gym-name">${esc(nameMain)}${nameAccent ? ` <em>${esc(nameAccent)}</em>` : ''}</div>
         ${subLine ? `<div class="gym-sub">${subLine}</div>` : ''}
       </div>

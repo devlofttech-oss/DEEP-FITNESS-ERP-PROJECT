@@ -20,5 +20,10 @@ const absolute = (path) => {
 export const BRAND_MARK = absolute(markAsset);
 export const BRAND_WORDMARK = absolute(wordmarkAsset);
 
-// The artwork is gold line-art drawn for a dark backing — it washes out on white.
+// The helmet-only mark is gold line-art drawn for a dark backing — on white it
+// washes out, so it needs a dark tile behind it.
 export const BRAND_MARK_ON_DARK = true;
+
+// The full logo (helmet + "DEEP FITNESS MYSORE") is tone-corrected for a light
+// page, so it sits on the receipt as plain transparent artwork — no tile.
+export const BRAND_WORDMARK_ON_DARK = false;
