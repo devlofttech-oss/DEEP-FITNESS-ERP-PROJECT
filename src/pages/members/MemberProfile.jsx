@@ -12,7 +12,7 @@ import { unfreezePatch } from '../../utils/membership';
 import { gymInfo as resolveGymInfo } from '../../utils/compat';
 import { publishReceipt, openReceiptWhatsApp } from '../../utils/receiptShare';
 import { openReceipt } from '../../utils/receipt';
-import { BRAND_MARK, BRAND_MARK_ON_DARK } from '../../utils/brand';
+import { BRAND_WORDMARK, BRAND_WORDMARK_ON_DARK } from '../../utils/brand';
 import { openWhatsApp } from '../../utils/whatsapp';
 
 // ── Attendance Calendar ─────────────────────────────────────────────────────
@@ -205,8 +205,9 @@ export default function MemberProfile() {
       gymInfo,
       member,
       payment: latestPayment,
-      logoUrl: gymInfo.logoUrl || BRAND_MARK,
-      logoOnDark: !gymInfo.logoUrl && BRAND_MARK_ON_DARK,
+      logoUrl: gymInfo.logoUrl || BRAND_WORDMARK,
+      logoOnDark: !gymInfo.logoUrl && BRAND_WORDMARK_ON_DARK,
+      logoVariant: gymInfo.logoUrl ? 'mark' : 'wordmark',
     }, { print });
     if (!ok) toast.error('Allow pop-ups for this site to open the receipt');
   };
